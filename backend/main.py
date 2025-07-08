@@ -128,93 +128,144 @@ Make this character feel destined for saga. Return only valid JSON."""
 
 @app.post("/api/advance_saga")
 async def advance_saga(character_data: dict):
-    """STAGE 2: LIFE TURN ENGINE - Simulate the next 5 years"""
+    """STAGE 2: STORY BEAT ENGINE - Advance to the next consequential moment"""
     try:
         current_age = character_data.get("currentAge", 20)
-        new_age = current_age + 5
+        print(f"🔍 ADVANCING SAGA: Starting with age {current_age}")
         
-        # Build context from character's history
-        recent_events = character_data.get("sagaLog", [])[-3:]  # Last 3 events
+        # Build narrative context from character's history
+        recent_events = character_data.get("sagaLog", [])[-3:]  # Last 3 events for context
         relationships = character_data.get("relationships", [])
         world_state = character_data.get("worldState", {})
         tags = character_data.get("initialTags", [])
         motifs = character_data.get("motifs", [])
         fate_seed = character_data.get("fateSeed", "Unknown")
         
-        system_prompt = f"""You are the Living Saga Engine continuing an epic Viking tale. You must advance the character's story by 5 years, weaving together their past, personality, and the threads of fate.
+        system_prompt = f"""You are the Living Saga Engine. Your job is to advance a Viking saga by MEANINGFUL STORY BEATS with ORGANIC TIME FLOW.
 
-Character's fate path: {fate_seed}
-Current motifs: {', '.join(motifs)}
-Active tags: {', '.join(tags)}
-Current age: {current_age} → advancing to {new_age}"""
+CRITICAL RULE: Time must be VARIABLE and story-appropriate. DO NOT default to 5 years. Examples:
+- Personal conflict resolution: 6-8 months
+- Learning new skills: 1-2 years  
+- Major life transition: 2-4 years
+- Epic journey or exile: 3-5 years
+- Quick relationship drama: 4-12 months
 
-        user_prompt = f"""Continue this Viking's saga for the next 5 years. Base events on their history, relationships, and world state:
+Current character age: {current_age}
+Fate path: {fate_seed}
+Motifs: {', '.join(motifs)}
+Tags: {', '.join(tags)}"""
 
-CHARACTER CONTEXT:
-Name: {character_data.get('name', 'Unknown')}
-Profession: {character_data.get('profession', 'Unknown')}
-Traits: {', '.join(character_data.get('traits', []))}
-Recent events: {[event.get('event', '') for event in recent_events]}
-Current relationships: {[rel.get('name', '') + ' (' + rel.get('type', '') + ')' for rel in relationships]}
-World tensions: {world_state.get('localTensions', 'Unknown')}
+        user_prompt = f"""ADVANCE THIS SAGA WITH ORGANIC TIME FLOW - DO NOT USE EXACTLY 5 YEARS!
 
-Generate the next chapter using this JSON structure:
+CHARACTER: {character_data.get('name', 'Unknown')}, age {current_age}
+RECENT EVENTS: {[event.get('event', '')[:100] for event in recent_events]}
+
+YOUR TASK:
+1. Choose time period based on story needs (6 months to 6 years - BE CREATIVE!)
+2. Calculate exact new age: {current_age} + your chosen time
+3. Create meaningful events that justify this time period
+4. Show concrete consequences
+
+EXAMPLE GOOD RESPONSES:
+- "timePassed": "14 months", "newAge": {current_age + 1}
+- "timePassed": "3 years", "newAge": {current_age + 3}  
+- "timePassed": "8 months", "newAge": {current_age + 1}
+
+Return this EXACT JSON format:
 
 {{
-  "narrative": "1-2 paragraphs describing the key events of these 5 years",
-  "newAge": {new_age},
-  "eventsThisTurn": ["List of 2-3 major events that happened"],
-  "quote": "A powerful quote from the character about this period",
-  "tagsEvolved": ["New tags gained or old ones that changed"],
-  "motifsStrengthened": ["Which existing motifs were reinforced"],
-  "newMotifs": ["Any new motifs that emerged"],
-  "relationshipChanges": [
-    {{
-      "name": "Person affected",
-      "change": "How the relationship changed",
-      "newStatus": "alive/dead/distant/loyal",
-      "bondStrength": "weak/moderate/strong"
-    }}
-  ],
-  "newRelationships": [
-    {{
-      "name": "New person in their life",
-      "type": "relationship type",
-      "status": "current status",
-      "bondStrength": "strength of bond",
-      "traits": ["1-2 defining traits"]
-    }}
-  ],
+  "timePassed": "[YOUR CREATIVE TIME CHOICE - NOT 5 YEARS!]",
+  "newAge": {current_age} + [YEARS FROM YOUR TIME CHOICE],
+  "narrative": "Story explaining why this specific time period made sense",
+  "storyBeats": ["Concrete event 1", "Concrete event 2"],
+  "quote": "Character quote about this period",
+  "tagsEvolved": ["new", "tags"],
+  "motifsStrengthened": ["existing motifs"],
+  "newMotifs": ["new motifs"],
+  "relationshipChanges": [],
+  "newRelationships": [],
+  "narrativeThreads": {{
+    "resolved": [],
+    "continuing": [], 
+    "newThreads": []
+  }},
   "worldStateChanges": {{
-    "localTensions": "How local conflicts evolved",
-    "mood": "New atmosphere in their region",
-    "majorEvents": "Any world-changing events they witnessed/caused"
-  }}
+    "localTensions": "updated tensions",
+    "mood": "new mood",
+    "majorEvents": "world changes"
+  }},
+  "consequences": "what changed for the character"
 }}
 
-Remember: This character follows the {fate_seed} path. Events should feel mythic and consequential. Return only valid JSON."""
+REMEMBER: BE CREATIVE WITH TIME! Make it fit the story, not a calendar!"""
 
+        print(f"🔍 SENDING TO OPENAI...")
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            max_tokens=800,
-            temperature=0.8
+            max_tokens=1000,
+            temperature=0.9  # Higher temperature for more creativity
         )
         
         saga_turn = response.choices[0].message.content.strip()
+        print(f"🔍 OPENAI RESPONSE: {saga_turn[:200]}...")
         
         try:
             turn_data = json.loads(saga_turn)
+            print(f"🔍 PARSED: timePassed={turn_data.get('timePassed')}, newAge={turn_data.get('newAge')}")
+            
+            # Validate and fix age calculation if needed
+            time_passed = turn_data.get('timePassed', '2 years')
+            new_age = turn_data.get('newAge')
+            
+            # Manual calculation if AI messed up
+            if not new_age or new_age <= current_age:
+                years_to_add = parse_time_to_years(time_passed)
+                new_age = current_age + years_to_add
+                turn_data['newAge'] = new_age
+                print(f"🔍 FIXED AGE: added {years_to_add} years, new age: {new_age}")
+            
             return turn_data
-        except json.JSONDecodeError:
-            return create_fallback_turn(character_data, new_age)
+            
+        except json.JSONDecodeError as e:
+            print(f"🔍 JSON PARSING FAILED: {e}")
+            print(f"🔍 RAW RESPONSE: {saga_turn}")
+            # Create fallback with random time advancement
+            random_years = random.choice([1, 2, 3, 4])  # No 5!
+            random_months = random.choice([6, 8, 10, 14, 18])
+            time_choice = random.choice([f"{random_years} years", f"{random_months} months"])
+            years_to_add = parse_time_to_years(time_choice)
+            return create_fallback_turn(character_data, current_age + years_to_add, time_choice)
             
     except Exception as e:
-        print(f"Error advancing saga: {str(e)}")
+        print(f"🔍 ERROR IN ADVANCE_SAGA: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to advance saga: {str(e)}")
+
+def parse_time_to_years(time_str):
+    """Parse time string like '18 months', '2 years' into years"""
+    import re
+    time_str = time_str.lower()
+    
+    # Extract numbers
+    numbers = re.findall(r'\d+', time_str)
+    if not numbers:
+        return 2  # fallback
+    
+    num = int(numbers[0])
+    
+    if 'month' in time_str:
+        years = round(num / 12, 1)
+        print(f"🔍 PARSED TIME: '{time_str}' = {years} years")
+        return years
+    elif 'year' in time_str:
+        print(f"🔍 PARSED TIME: '{time_str}' = {num} years")
+        return num
+    else:
+        print(f"🔍 COULDN'T PARSE: '{time_str}', defaulting to 2 years")
+        return 2
 
 @app.post("/api/generate_legacy")
 async def generate_legacy(character_data: dict):
@@ -304,23 +355,36 @@ def create_fallback_character(fate_seed, motifs, traits):
         }]
     }
 
-def create_fallback_turn(character_data, new_age):
-    """Fallback turn advancement if OpenAI fails"""
+def create_fallback_turn(character_data, new_age, time_passed="2 years"):
+    """Enhanced fallback turn with narrative focus"""
+    print(f"🔍 USING FALLBACK: {time_passed}, new age: {new_age}")
+    
     return {
-        "narrative": "The years passed with both triumph and trial, shaping the character through adversity and growth.",
+        "timePassed": time_passed,
         "newAge": new_age,
-        "eventsThisTurn": ["Faced a significant challenge", "Made a crucial alliance"],
-        "quote": "Each season teaches us what we need to become",
-        "tagsEvolved": ["weathered", "experienced"],
+        "narrative": "The years brought both triumph and hardship, as fate wove new threads into the tapestry of their legend. Old bonds were tested while new alliances formed in the shadow of greater challenges yet to come.",
+        "storyBeats": [
+            "Faced a significant personal challenge that tested their resolve",
+            "Formed or strengthened an important alliance",
+            "Gained new insight about their destiny"
+        ],
+        "quote": "Some paths are chosen, others are carved with blood and determination",
+        "tagsEvolved": ["tested", "resolute"],
         "motifsStrengthened": [character_data.get("motifs", ["Iron Will"])[0]],
-        "newMotifs": ["Wisdom's Weight"],
+        "newMotifs": ["Threads of Fate"],
         "relationshipChanges": [],
         "newRelationships": [],
+        "narrativeThreads": {
+            "resolved": [],
+            "continuing": ["The character's ongoing struggle with their destiny"],
+            "newThreads": ["A new challenge approaches on the horizon"]
+        },
         "worldStateChanges": {
-            "localTensions": "Conflicts continue to simmer",
-            "mood": "uncertain",
-            "majorEvents": "Minor skirmishes shape the region"
-        }
+            "localTensions": "Regional conflicts continue to evolve",
+            "mood": "anticipation",
+            "majorEvents": "Subtle shifts in the balance of power"
+        },
+        "consequences": "Gained wisdom and allies, but at the cost of innocence"
     }
 
 def create_fallback_legacy(character_data):
